@@ -27,8 +27,12 @@ func main() {
     }
     
     fmt.Println("Server starting on" + port)
-    
-    err := r.Run(port)
+    officer, err := AddPoliceOfficer("email", "name", "pass")
+    if err != nil {
+        fmt.Println(err)
+    }
+    fmt.Println(officer)
+    err = r.Run(port)
     if err != nil {
         fmt.Println(err)
     }

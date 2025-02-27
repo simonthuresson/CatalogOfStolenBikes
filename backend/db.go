@@ -4,27 +4,47 @@ import (
     "fmt"
     "log"
     "time"
+    "sync"
 
     "gorm.io/driver/postgres"
     "gorm.io/gorm"
     "gorm.io/gorm/logger"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Models
-type User struct {
-    gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
-    Email     string     `gorm:"uniqueIndex"`
-    Name      string
-    Posts     []Post     `gorm:"foreignKey:AuthorID"`
+type Police struct {
+	gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
+	Email     string     `gorm:"uniqueIndex"`
+	Password  string     `gorm:"not null" json:"-"` // Password field, excluded from JSON responses
+	Name      string
+	AssignedCases []Bike `gorm:"foreignKey:PoliceID"` // One-to-many relationship
 }
 
-type Post struct {
-    gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
-    Title     string
-    Content   string
-    AuthorID  uint
-    Author    User
+type Citizen struct {
+	gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
+	Email     string     `gorm:"uniqueIndex"` // Added email for login
+	Password  string     `gorm:"not null" json:"-"` // Password field, excluded from JSON responses
+    Name      string
+	AuthorID  uint
+	StolenBikes []Bike `gorm:"foreignKey:CitizenID"` // One-to-many relationship
 }
+
+type Bike struct {
+	gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
+	Description string
+	PoliceID    uint     // Foreign key for Police
+	Police      Police   `gorm:"foreignKey:PoliceID"` // Belongs-to relationship
+	CitizenID   uint     // Foreign key for Citizen
+	Citizen     Citizen  `gorm:"foreignKey:CitizenID"` // Belongs-to relationship
+	Found       bool     // Fixed lowercase to uppercase
+}
+
+
+var (
+	DB   *gorm.DB
+	once sync.Once
+)
 
 func Database() {
     // Database connection parameters
@@ -46,55 +66,50 @@ func Database() {
             Colorful:                  true,
         },
     )
-
+    var err error
     // Open connection to database
-    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+    DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
         Logger: gormLogger,
     })
     if err != nil {
         log.Fatalf("Failed to connect to database: %v", err)
     }
 
-	if err := db.Migrator().DropTable(&Post{}); err != nil {
+	if err := DB.Migrator().DropTable(&Police{}); err != nil {
 		log.Fatalf("Failed to drop Post table: %v", err)
 	}
-	if err := db.Migrator().DropTable(&User{}); err != nil {
+	if err := DB.Migrator().DropTable(&Citizen{}); err != nil {
+		log.Fatalf("Failed to drop User table: %v", err)
+	}
+    if err := DB.Migrator().DropTable(&Bike{}); err != nil {
 		log.Fatalf("Failed to drop User table: %v", err)
 	}
 
     // Auto migrate the schema
-    err = db.AutoMigrate(&User{}, &Post{})
+    err = DB.AutoMigrate(&Citizen{}, &Bike{}, &Police{})
     if err != nil {
         log.Fatalf("Failed to migrate database: %v", err)
     }
+}
 
-    // Create a test user
-    user := User{
-		Email: "john.doe@example.com",
-		Name:  "John Doe",
-		Posts: []Post{
-			{
-				Title:   "My First Post",
-				Content: "This is the content of my first post",
-			},
-			{
-				Title:   "My Second Post",
-				Content: "This is the content of my second post",
-			},
-		},
+func AddPoliceOfficer(email, name, password string) (*Police, error) {
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
-
-    result := db.Create(&user)
-    if result.Error != nil {
-        log.Fatalf("Failed to create user: %v", result.Error)
-    }
-
-    // Query the user with their posts
-    var retrievedUser User
-	result = db.Preload("Posts").First(&retrievedUser)
-    if result.Error != nil {
-        log.Fatalf("Failed to retrieve user: %v", result.Error)
-    }
-
-    fmt.Printf("User: %v\n", retrievedUser)
+	
+	// Create police record
+	newPolice := Police{
+		Email:    email,
+		Password: string(hashedPassword),
+		Name:     name,
+	}
+	
+	// Save to database
+	if result := DB.Create(&newPolice); result.Error != nil {
+		return nil, fmt.Errorf("failed to create police record: %w", result.Error)
+	}
+	
+	return &newPolice, nil
 }
