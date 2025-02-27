@@ -32,6 +32,11 @@ func main() {
         fmt.Println(err)
     }
     fmt.Println(officer)
+    officer, err = AddPoliceOfficer("email2", "name", "pass")
+    if err != nil {
+        fmt.Println(err)
+    }
+    fmt.Println(officer)
     err = r.Run(port)
     if err != nil {
         fmt.Println(err)
