@@ -3,10 +3,18 @@ package main
 import (
 	"fmt"
 	"net/http"
+    "time"
 
+    "github.com/golang-jwt/jwt/v5"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type JWTClaim struct {
+	Email string `json:"email"`
+	UserID   uint   `json:"user_id"`
+	jwt.RegisteredClaims
+}
 
 func setupAPIRoutes(r *gin.Engine) {
 	// Create an api group/router
@@ -32,8 +40,82 @@ func setupAPIRoutes(r *gin.Engine) {
 	login := r.Group("/login")
 	{
 		login.POST("police")
-		login.POST("citizen")
+		login.POST("citizen", loginCitizen)
 	}
+}
+
+func loginCitizen(c *gin.Context) {
+    type LoginRequest struct {
+        Email    string `json:"email" binding:"required,email"`
+        Password string `json:"password" binding:"required"`
+    }
+    var req LoginRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+
+    // Find the citizen
+    var citizen Citizen
+    if result := DB.Where("email = ?", req.Email).First(&citizen); result.Error != nil {
+        c.JSON(http.StatusNotFound, gin.H{
+            "error": "Citizen not found",
+        })
+        return
+    }
+
+    // Compare the password
+    if err := bcrypt.CompareHashAndPassword([]byte(citizen.Password), []byte(req.Password)); err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{
+            "error": "Invalid password",
+        })
+        return
+    }
+
+    // Generate JWT
+    token, err := generateJWT(citizen)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
+		return
+	}
+
+	// Set JWT token as a cookie
+	c.SetCookie(
+		"jwt_token",  // cookie name
+		token,        // cookie value
+		60*60*24,     // max age in seconds (24 hours)
+		"/",          // path
+		"",           // domain
+		false,        // secure (set to true in production with HTTPS)
+		true,         // http only (prevents JavaScript access)
+	)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+}
+
+var jwtKey = []byte("some_secret_key")
+
+func generateJWT(user Citizen) (string, error) {
+	expirationTime := time.Now().Add(24 * time.Hour) // Token expires in 24 hours
+
+	claims := &JWTClaim{
+		Email: user.Email,
+		UserID:   user.ID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
 
 func foundBike(c *gin.Context) {
