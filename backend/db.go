@@ -18,7 +18,7 @@ type Police struct {
     Email    string `gorm:"uniqueIndex"`
     Password string `gorm:"not null" json:"-"`
     Name     string
-    // No direct reference to Bike is needed here
+    AssignedBike *Bike `gorm:"foreignKey:PoliceID"`
 }
 
 type Citizen struct {

@@ -64,9 +64,9 @@ func foundBike(c *gin.Context) {
 func getAllBikes(c *gin.Context) {
     var bikes []Bike
     
-    // Only preload Police when PoliceID is not zero
+    // Preload relationships
     DB.Preload("Citizen").
-       Preload("Police", "id > 0").
+       Preload("Police").
        Find(&bikes)
     
     c.JSON(http.StatusOK, gin.H{
@@ -75,17 +75,20 @@ func getAllBikes(c *gin.Context) {
 }
 
 func createBike(c *gin.Context) {
-	type ReportStolenBikeRequest struct {
-		Description string `json:"description" binding:"required"`
-		CitizenID   uint   `json:"citizen_id" binding:"required"`
-	}
-	var req ReportStolenBikeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
+    type ReportStolenBikeRequest struct {
+        Description string `json:"description" binding:"required"`
+        CitizenID   uint   `json:"citizen_id" binding:"required"`
+    }
+    
+    var req ReportStolenBikeRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+    
+    // Verify citizen exists
     var citizen Citizen
     if result := DB.First(&citizen, req.CitizenID); result.Error != nil {
         c.JSON(http.StatusNotFound, gin.H{
@@ -93,21 +96,48 @@ func createBike(c *gin.Context) {
         })
         return
     }
-	newBike := Bike{
-		Description: req.Description,
-		CitizenID:   req.CitizenID,
-		Citizen:     citizen, 
-		Found:       false,
-	}
-	if result := DB.Create(&newBike); result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to report stolen bike",
-		})
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Stolen bike reported",
-	})
+    
+    // Initialize new bike with nil Police fields
+    newBike := Bike{
+        Description: req.Description,
+        CitizenID:   req.CitizenID,
+        Citizen:     citizen, 
+        Found:       false,
+        PoliceID:    nil,
+        Police:      nil,
+    }
+    
+    // Try to find an available police officer
+    var police Police
+    result := DB.Where("id NOT IN (SELECT police_id FROM bikes WHERE police_id IS NOT NULL)").First(&police)
+    
+    // If a police officer is found, assign them to the bike
+    if result.Error == nil {
+        newBike.PoliceID = &police.ID
+        newBike.Police = &police
+    }
+    
+    // Create the bike
+    if result := DB.Create(&newBike); result.Error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to report stolen bike",
+        })
+        return
+    }
+    
+    // Prepare response message
+    responseMsg := "Stolen bike reported"
+    if newBike.PoliceID != nil {
+        responseMsg += " and assigned to police"
+    } else {
+        responseMsg += " but no available police to assign"
+    }
+    
+    c.JSON(http.StatusCreated, gin.H{
+        "message": responseMsg,
+        "bike_id": newBike.ID,
+        "assigned_to_police_id": newBike.PoliceID,
+    })
 }
 
 func createCitizen(c *gin.Context) {
@@ -149,7 +179,7 @@ func createCitizen(c *gin.Context) {
 
 func getAllCitizen(c *gin.Context) {
 	var citizens []Citizen
-	DB.Find(&citizens)
+	DB.Preload("StolenBikes").Find(&citizens)
 	c.JSON(http.StatusOK, gin.H{
 		"data": citizens,
 	})
@@ -158,7 +188,7 @@ func getAllCitizen(c *gin.Context) {
 // Handler functions
 func getAllPolice(c *gin.Context) {
 	var polices []Police
-	DB.Find(&polices)
+	DB.Preload("AssignedBike").Find(&polices)
 	c.JSON(http.StatusOK, gin.H{
 		"data": polices,
 	})
