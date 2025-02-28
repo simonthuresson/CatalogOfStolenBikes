@@ -16,7 +16,16 @@ func setupAPIRoutes(r *gin.Engine) {
         police.POST("/", createPolice)
         police.PATCH("/:id", updatePolice)
         police.DELETE("/:id", deletePolice)
-
+    }
+    citizen := api.Group("/citizen")
+    {
+        citizen.GET("/", getAllCitizen)
+        citizen.POST("/", createCitizen)
+    }
+    bike := api.Group("/bike")
+    {
+        bike.GET("/", getAllBikes)
+        bike.POST("/", createBike)
     }
     login := r.Group("/login")
     {
@@ -24,6 +33,82 @@ func setupAPIRoutes(r *gin.Engine) {
         login.POST("citizen")
     }
 }
+
+func getAllBikes(c *gin.Context) {
+    var bikes []Bike
+    DB.Find(&bikes)
+    c.JSON(http.StatusOK, gin.H{
+        "bikes": bikes,
+    })
+}
+
+func createBike(c *gin.Context) {
+    type ReportStolenBikeRequest struct {
+        Description string `json:"description" binding:"required"`
+        CitizenID   uint   `json:"citizen_id" binding:"required"`
+    }
+    var req ReportStolenBikeRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+    newBike := Bike{
+        Description: req.Description,
+        CitizenID:   req.CitizenID,
+        Found:       false,
+    }
+    if result := DB.Create(&newBike); result.Error != nil {
+        fmt.Println("failed to create bike record: %w", result.Error)
+    }
+    c.JSON(http.StatusCreated, gin.H{
+        "message": "Stolen bike reported",
+    })
+}
+
+func createCitizen(c *gin.Context) {
+    type CreateCitizenRequest struct {
+        Email    string `json:"email" binding:"required,email"`
+        Name     string `json:"name" binding:"required"`
+        Password string `json:"password" binding:"required,min=6"`
+    }
+    var req CreateCitizenRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+    if err != nil {
+        fmt.Println("failed to hash password: %w", err)
+    }
+    
+    // Create citizen record
+    newCitizen := Citizen{
+        Email:    req.Email,
+        Password: string(hashedPassword),
+        Name:     req.Name,
+    }
+    
+    // Save to database
+    if result := DB.Create(&newCitizen); result.Error != nil {
+        fmt.Println("failed to create citizen record: %w", result.Error)
+    }
+    c.JSON(http.StatusCreated, gin.H{
+        "message": "User created",
+    })
+}
+
+func getAllCitizen(c *gin.Context) {
+    var citizens []Citizen
+    DB.Find(&citizens)
+    c.JSON(http.StatusOK, gin.H{
+        "data": citizens,
+    })
+}
+
 
 // Handler functions
 func getAllPolice(c *gin.Context) {
