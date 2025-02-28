@@ -15,10 +15,10 @@ import (
 // Models
 type Police struct {
     gorm.Model
-    Email       string `gorm:"uniqueIndex"`
-    Password    string `gorm:"not null" json:"-"`
-    Name        string
-    // Remove the AssignedCase field from here - we'll use HasOne instead
+    Email    string `gorm:"uniqueIndex"`
+    Password string `gorm:"not null" json:"-"`
+    Name     string
+    // No direct reference to Bike is needed here
 }
 
 type Citizen struct {
@@ -32,10 +32,10 @@ type Citizen struct {
 type Bike struct {
     gorm.Model
     Description string
-    PoliceID    uint   `gorm:"unique"` // This ensures a bike can only belong to one police officer
-    Police      Police // Belongs-to relationship
-    CitizenID   uint
-    Citizen     Citizen // Belongs-to relationship
+    PoliceID    *uint   `gorm:"unique"`
+    Police      *Police 
+    CitizenID   uint   `gorm:"not null"`
+    Citizen     Citizen  // Add omitempty
     Found       bool
 }
 

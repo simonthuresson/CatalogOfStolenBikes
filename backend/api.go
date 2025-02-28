@@ -27,6 +27,7 @@ func setupAPIRoutes(r *gin.Engine) {
 	{
 		bike.GET("/", getAllBikes)
 		bike.POST("/", createBike)
+		bike.GET("/found/:id", foundBike)
 	}
 	login := r.Group("/login")
 	{
@@ -35,12 +36,42 @@ func setupAPIRoutes(r *gin.Engine) {
 	}
 }
 
+func foundBike(c *gin.Context) {
+    id := c.Param("id")
+    
+    // Update only the Found field without loading the entire record
+    result := DB.Model(&Bike{}).Where("id = ?", id).Update("found", true)
+    
+    if result.Error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to update bike",
+        })
+        return
+    }
+    
+    if result.RowsAffected == 0 {
+        c.JSON(http.StatusNotFound, gin.H{
+            "error": "Bike not found",
+        })
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Bike marked as found",
+    })
+}
+
 func getAllBikes(c *gin.Context) {
-	var bikes []Bike
-	DB.Find(&bikes)
-	c.JSON(http.StatusOK, gin.H{
-		"bikes": bikes,
-	})
+    var bikes []Bike
+    
+    // Only preload Police when PoliceID is not zero
+    DB.Preload("Citizen").
+       Preload("Police", "id > 0").
+       Find(&bikes)
+    
+    c.JSON(http.StatusOK, gin.H{
+        "bikes": bikes,
+    })
 }
 
 func createBike(c *gin.Context) {
@@ -55,13 +86,24 @@ func createBike(c *gin.Context) {
 		})
 		return
 	}
+    var citizen Citizen
+    if result := DB.First(&citizen, req.CitizenID); result.Error != nil {
+        c.JSON(http.StatusNotFound, gin.H{
+            "error": "Citizen not found",
+        })
+        return
+    }
 	newBike := Bike{
 		Description: req.Description,
 		CitizenID:   req.CitizenID,
+		Citizen:     citizen, 
 		Found:       false,
 	}
 	if result := DB.Create(&newBike); result.Error != nil {
-		fmt.Println("failed to create bike record: %w", result.Error)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to report stolen bike",
+		})
+		return
 	}
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Stolen bike reported",
@@ -209,9 +251,9 @@ func createPolice(c *gin.Context) {
 	// Save to database
 	if result := DB.Create(&newPolice); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-            "error": "Failed to create police",
-        })
-        return
+			"error": "Failed to create police",
+		})
+		return
 	}
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "User created",
