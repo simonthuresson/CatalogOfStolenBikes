@@ -324,6 +324,12 @@ func createPolice(c *gin.Context) {
 
 func deletePolice(c *gin.Context) {
 	id := c.Param("id")
+    if err := DB.Model(&Bike{}).Where("police_id = ?", id).Update("police_id", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update assigned bikes",
+		})
+		return
+	}
 	DB.Delete(&Police{}, id)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Police " + id + " deleted",
