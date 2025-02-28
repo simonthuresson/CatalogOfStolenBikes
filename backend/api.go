@@ -39,8 +39,23 @@ func setupAPIRoutes(r *gin.Engine) {
 func foundBike(c *gin.Context) {
     id := c.Param("id")
     
-    // Update only the Found field without loading the entire record
-    result := DB.Model(&Bike{}).Where("id = ?", id).Update("found", true)
+    // First check if the bike exists
+    var bike Bike
+    if err := DB.First(&bike, id).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{
+            "error": "Bike not found",
+        })
+        return
+    }
+    
+    // Get the current police ID before updating
+    previousPoliceID := bike.PoliceID
+    
+    // Update the bike: mark as found and clear police reference
+    result := DB.Model(&Bike{}).Where("id = ?", id).Updates(map[string]interface{}{
+        "found": true,
+        "police_id": nil,
+    })
     
     if result.Error != nil {
         c.JSON(http.StatusInternalServerError, gin.H{
@@ -49,15 +64,32 @@ func foundBike(c *gin.Context) {
         return
     }
     
-    if result.RowsAffected == 0 {
-        c.JSON(http.StatusNotFound, gin.H{
-            "error": "Bike not found",
-        })
-        return
+    // Only try to reassign if a police officer was freed up
+    if previousPoliceID != nil {
+        // Find another stolen bike without an assigned police officer
+        var unassignedBike Bike
+        if err := DB.Where("found = ? AND police_id IS NULL", false).First(&unassignedBike).Error; err != nil {
+            // No unassigned bikes found, that's fine
+            fmt.Println("No unassigned bikes available for reassignment")
+        } else {
+            // Find an available police officer (one without an assigned bike)
+            var availablePolice Police
+            if err := DB.Where("id = ?", *previousPoliceID).First(&availablePolice).Error; err != nil {
+                fmt.Println("Could not find the previously assigned police officer")
+            } else {
+                // Assign this police officer to the unassigned bike
+                if err := DB.Model(&unassignedBike).Update("police_id", *previousPoliceID).Error; err != nil {
+                    fmt.Println("Error assigning police to new bike:", err)
+                } else {
+                    fmt.Printf("Police officer %s (ID: %d) reassigned to bike ID: %d\n", 
+                               availablePolice.Name, *previousPoliceID, unassignedBike.ID)
+                }
+            }
+        }
     }
     
     c.JSON(http.StatusOK, gin.H{
-        "message": "Bike marked as found",
+        "message": "Bike marked as found and police officer unassigned",
     })
 }
 
