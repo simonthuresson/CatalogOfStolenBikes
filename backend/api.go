@@ -3,16 +3,16 @@ package main
 import (
 	"fmt"
 	"net/http"
-    "time"
+	"time"
 
-    "github.com/golang-jwt/jwt/v5"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type JWTClaim struct {
-	Email string `json:"email"`
-	UserID   uint   `json:"user_id"`
+	Email  string `json:"email"`
+	UserID uint   `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
@@ -28,10 +28,11 @@ func setupAPIRoutes(r *gin.Engine) {
 	}
 	citizen := api.Group("/citizen")
 	{
-		citizen.GET("/", getAllCitizen)
+        citizen.GET("/", getAllCitizen)
 		citizen.POST("/", createCitizen)
 	}
 	bike := api.Group("/bike")
+    bike.Use((authMiddleware()))
 	{
 		bike.GET("/", getAllBikes)
 		bike.POST("/", createBike)
@@ -44,38 +45,81 @@ func setupAPIRoutes(r *gin.Engine) {
 	}
 }
 
+func authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get token from cookie
+		tokenString, err := c.Cookie("jwt_token")
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+			c.Abort()
+			return
+		}
+
+		// Parse and validate token
+		token, err := jwt.ParseWithClaims(tokenString, &JWTClaim{}, func(token *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.Abort()
+			return
+		}
+
+		// Check if the token is valid
+		claims, ok := token.Claims.(*JWTClaim)
+		if !ok || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
+
+		// Find user by ID
+		var citizen Citizen
+		if result := DB.First(&citizen, claims.ID); result.Error != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+            return
+        }
+
+		// Set citizen in context
+		c.Set("citizen", citizen)
+		c.Next()
+	}
+}
+
 func loginCitizen(c *gin.Context) {
-    type LoginRequest struct {
-        Email    string `json:"email" binding:"required,email"`
-        Password string `json:"password" binding:"required"`
-    }
-    var req LoginRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{
-            "error": err.Error(),
-        })
-        return
-    }
+	type LoginRequest struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+	}
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
 
-    // Find the citizen
-    var citizen Citizen
-    if result := DB.Where("email = ?", req.Email).First(&citizen); result.Error != nil {
-        c.JSON(http.StatusNotFound, gin.H{
-            "error": "Citizen not found",
-        })
-        return
-    }
+	// Find the citizen
+	var citizen Citizen
+	if result := DB.Where("email = ?", req.Email).First(&citizen); result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Citizen not found",
+		})
+		return
+	}
 
-    // Compare the password
-    if err := bcrypt.CompareHashAndPassword([]byte(citizen.Password), []byte(req.Password)); err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{
-            "error": "Invalid password",
-        })
-        return
-    }
+	// Compare the password
+	if err := bcrypt.CompareHashAndPassword([]byte(citizen.Password), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Invalid password",
+		})
+		return
+	}
 
-    // Generate JWT
-    token, err := generateJWT(citizen)
+	// Generate JWT
+	token, err := generateJWT(citizen)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return
@@ -83,13 +127,13 @@ func loginCitizen(c *gin.Context) {
 
 	// Set JWT token as a cookie
 	c.SetCookie(
-		"jwt_token",  // cookie name
-		token,        // cookie value
-		60*60*24,     // max age in seconds (24 hours)
-		"/",          // path
-		"",           // domain
-		false,        // secure (set to true in production with HTTPS)
-		true,         // http only (prevents JavaScript access)
+		"jwt_token", // cookie name
+		token,       // cookie value
+		60*60*24,    // max age in seconds (24 hours)
+		"/",         // path
+		"",          // domain
+		false,       // secure (set to true in production with HTTPS)
+		true,        // http only (prevents JavaScript access)
 	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
@@ -101,8 +145,8 @@ func generateJWT(user Citizen) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour) // Token expires in 24 hours
 
 	claims := &JWTClaim{
-		Email: user.Email,
-		UserID:   user.ID,
+		Email:  user.Email,
+		UserID: user.ID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -119,139 +163,139 @@ func generateJWT(user Citizen) (string, error) {
 }
 
 func foundBike(c *gin.Context) {
-    id := c.Param("id")
-    
-    // First check if the bike exists
-    var bike Bike
-    if err := DB.First(&bike, id).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{
-            "error": "Bike not found",
-        })
-        return
-    }
-    
-    // Get the current police ID before updating
-    previousPoliceID := bike.PoliceID
-    
-    // Update the bike: mark as found and clear police reference
-    result := DB.Model(&Bike{}).Where("id = ?", id).Updates(map[string]interface{}{
-        "found": true,
-        "police_id": nil,
-    })
-    
-    if result.Error != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{
-            "error": "Failed to update bike",
-        })
-        return
-    }
-    
-    // Only try to reassign if a police officer was freed up
-    if previousPoliceID != nil {
-        // Find another stolen bike without an assigned police officer
-        var unassignedBike Bike
-        if err := DB.Where("found = ? AND police_id IS NULL", false).First(&unassignedBike).Error; err != nil {
-            // No unassigned bikes found, that's fine
-            fmt.Println("No unassigned bikes available for reassignment")
-        } else {
-            // Find an available police officer (one without an assigned bike)
-            var availablePolice Police
-            if err := DB.Where("id = ?", *previousPoliceID).First(&availablePolice).Error; err != nil {
-                fmt.Println("Could not find the previously assigned police officer")
-            } else {
-                // Assign this police officer to the unassigned bike
-                if err := DB.Model(&unassignedBike).Update("police_id", *previousPoliceID).Error; err != nil {
-                    fmt.Println("Error assigning police to new bike:", err)
-                } else {
-                    fmt.Printf("Police officer %s (ID: %d) reassigned to bike ID: %d\n", 
-                               availablePolice.Name, *previousPoliceID, unassignedBike.ID)
-                }
-            }
-        }
-    }
-    
-    c.JSON(http.StatusOK, gin.H{
-        "message": "Bike marked as found and police officer unassigned",
-    })
+	id := c.Param("id")
+
+	// First check if the bike exists
+	var bike Bike
+	if err := DB.First(&bike, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Bike not found",
+		})
+		return
+	}
+
+	// Get the current police ID before updating
+	previousPoliceID := bike.PoliceID
+
+	// Update the bike: mark as found and clear police reference
+	result := DB.Model(&Bike{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"found":     true,
+		"police_id": nil,
+	})
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update bike",
+		})
+		return
+	}
+
+	// Only try to reassign if a police officer was freed up
+	if previousPoliceID != nil {
+		// Find another stolen bike without an assigned police officer
+		var unassignedBike Bike
+		if err := DB.Where("found = ? AND police_id IS NULL", false).First(&unassignedBike).Error; err != nil {
+			// No unassigned bikes found, that's fine
+			fmt.Println("No unassigned bikes available for reassignment")
+		} else {
+			// Find an available police officer (one without an assigned bike)
+			var availablePolice Police
+			if err := DB.Where("id = ?", *previousPoliceID).First(&availablePolice).Error; err != nil {
+				fmt.Println("Could not find the previously assigned police officer")
+			} else {
+				// Assign this police officer to the unassigned bike
+				if err := DB.Model(&unassignedBike).Update("police_id", *previousPoliceID).Error; err != nil {
+					fmt.Println("Error assigning police to new bike:", err)
+				} else {
+					fmt.Printf("Police officer %s (ID: %d) reassigned to bike ID: %d\n",
+						availablePolice.Name, *previousPoliceID, unassignedBike.ID)
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Bike marked as found and police officer unassigned",
+	})
 }
 
 func getAllBikes(c *gin.Context) {
-    var bikes []Bike
-    
-    // Preload relationships
-    DB.Preload("Citizen").
-       Preload("Police").
-       Find(&bikes)
-    
-    c.JSON(http.StatusOK, gin.H{
-        "bikes": bikes,
-    })
+	var bikes []Bike
+
+	// Preload relationships
+	DB.Preload("Citizen").
+		Preload("Police").
+		Find(&bikes)
+
+	c.JSON(http.StatusOK, gin.H{
+		"bikes": bikes,
+	})
 }
 
 func createBike(c *gin.Context) {
-    type ReportStolenBikeRequest struct {
-        Description string `json:"description" binding:"required"`
-        CitizenID   uint   `json:"citizen_id" binding:"required"`
-    }
-    
-    var req ReportStolenBikeRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{
-            "error": err.Error(),
-        })
-        return
-    }
-    
-    // Verify citizen exists
-    var citizen Citizen
-    if result := DB.First(&citizen, req.CitizenID); result.Error != nil {
-        c.JSON(http.StatusNotFound, gin.H{
-            "error": "Citizen not found",
-        })
-        return
-    }
-    
-    // Initialize new bike with nil Police fields
-    newBike := Bike{
-        Description: req.Description,
-        CitizenID:   req.CitizenID,
-        Citizen:     citizen, 
-        Found:       false,
-        PoliceID:    nil,
-        Police:      nil,
-    }
-    
-    // Try to find an available police officer
-    var police Police
-    result := DB.Where("id NOT IN (SELECT police_id FROM bikes WHERE police_id IS NOT NULL)").First(&police)
-    
-    // If a police officer is found, assign them to the bike
-    if result.Error == nil {
-        newBike.PoliceID = &police.ID
-        newBike.Police = &police
-    }
-    
-    // Create the bike
-    if result := DB.Create(&newBike); result.Error != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{
-            "error": "Failed to report stolen bike",
-        })
-        return
-    }
-    
-    // Prepare response message
-    responseMsg := "Stolen bike reported"
-    if newBike.PoliceID != nil {
-        responseMsg += " and assigned to police"
-    } else {
-        responseMsg += " but no available police to assign"
-    }
-    
-    c.JSON(http.StatusCreated, gin.H{
-        "message": responseMsg,
-        "bike_id": newBike.ID,
-        "assigned_to_police_id": newBike.PoliceID,
-    })
+	type ReportStolenBikeRequest struct {
+		Description string `json:"description" binding:"required"`
+		CitizenID   uint   `json:"citizen_id" binding:"required"`
+	}
+
+	var req ReportStolenBikeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Verify citizen exists
+	var citizen Citizen
+	if result := DB.First(&citizen, req.CitizenID); result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Citizen not found",
+		})
+		return
+	}
+
+	// Initialize new bike with nil Police fields
+	newBike := Bike{
+		Description: req.Description,
+		CitizenID:   req.CitizenID,
+		Citizen:     citizen,
+		Found:       false,
+		PoliceID:    nil,
+		Police:      nil,
+	}
+
+	// Try to find an available police officer
+	var police Police
+	result := DB.Where("id NOT IN (SELECT police_id FROM bikes WHERE police_id IS NOT NULL)").First(&police)
+
+	// If a police officer is found, assign them to the bike
+	if result.Error == nil {
+		newBike.PoliceID = &police.ID
+		newBike.Police = &police
+	}
+
+	// Create the bike
+	if result := DB.Create(&newBike); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to report stolen bike",
+		})
+		return
+	}
+
+	// Prepare response message
+	responseMsg := "Stolen bike reported"
+	if newBike.PoliceID != nil {
+		responseMsg += " and assigned to police"
+	} else {
+		responseMsg += " but no available police to assign"
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":               responseMsg,
+		"bike_id":               newBike.ID,
+		"assigned_to_police_id": newBike.PoliceID,
+	})
 }
 
 func createCitizen(c *gin.Context) {
@@ -406,7 +450,7 @@ func createPolice(c *gin.Context) {
 
 func deletePolice(c *gin.Context) {
 	id := c.Param("id")
-    if err := DB.Model(&Bike{}).Where("police_id = ?", id).Update("police_id", nil).Error; err != nil {
+	if err := DB.Model(&Bike{}).Where("police_id = ?", id).Update("police_id", nil).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update assigned bikes",
 		})
