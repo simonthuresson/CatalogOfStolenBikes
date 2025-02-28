@@ -14,30 +14,29 @@ import (
 
 // Models
 type Police struct {
-	gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
-	Email     string     `gorm:"uniqueIndex"`
-	Password  string     `gorm:"not null" json:"-"` // Password field, excluded from JSON responses
-	Name      string
-	AssignedCases []Bike `gorm:"foreignKey:PoliceID"` // One-to-many relationship
+    gorm.Model
+    Email       string `gorm:"uniqueIndex"`
+    Password    string `gorm:"not null" json:"-"`
+    Name        string
+    // Remove the AssignedCase field from here - we'll use HasOne instead
 }
 
 type Citizen struct {
-	gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
-	Email     string     `gorm:"uniqueIndex"` // Added email for login
-	Password  string     `gorm:"not null" json:"-"` // Password field, excluded from JSON responses
-    Name      string
-	AuthorID  uint
-	StolenBikes []Bike `gorm:"foreignKey:CitizenID"` // One-to-many relationship
+    gorm.Model
+    Email       string `gorm:"uniqueIndex"`
+    Password    string `gorm:"not null" json:"-"`
+    Name        string
+    StolenBikes []Bike `gorm:"foreignKey:CitizenID"` // One-to-many relationship
 }
 
 type Bike struct {
-	gorm.Model           // Embeds ID, CreatedAt, UpdatedAt, and DeletedAt
-	Description string
-	PoliceID    uint     // Foreign key for Police
-	Police      Police   `gorm:"foreignKey:PoliceID"` // Belongs-to relationship
-	CitizenID   uint     // Foreign key for Citizen
-	Citizen     Citizen  `gorm:"foreignKey:CitizenID"` // Belongs-to relationship
-	Found       bool     // Fixed lowercase to uppercase
+    gorm.Model
+    Description string
+    PoliceID    uint   `gorm:"unique"` // This ensures a bike can only belong to one police officer
+    Police      Police // Belongs-to relationship
+    CitizenID   uint
+    Citizen     Citizen // Belongs-to relationship
+    Found       bool
 }
 
 
