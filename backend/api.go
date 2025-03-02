@@ -28,11 +28,11 @@ func setupAPIRoutes(r *gin.Engine) {
 	}
 	citizen := api.Group("/citizen")
 	{
-        citizen.GET("/", getAllCitizen)
+		citizen.GET("/", getAllCitizen)
 		citizen.POST("/", createCitizen)
 	}
 	bike := api.Group("/bike")
-    bike.Use((authMiddleware()))
+	bike.Use((authMiddleware()))
 	{
 		bike.GET("/", getAllBikes)
 		bike.POST("/", createBike)
@@ -77,10 +77,10 @@ func authMiddleware() gin.HandlerFunc {
 		// Find user by ID
 		var citizen Citizen
 		if result := DB.First(&citizen, claims.ID); result.Error != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 			c.Abort()
-            return
-        }
+			return
+		}
 
 		// Set citizen in context
 		c.Set("citizen", citizen)
