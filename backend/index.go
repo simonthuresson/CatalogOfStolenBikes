@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-
+    "app/db"
+    "app/routes"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	Database()
+	db.Database()
 	r := gin.Default()
 
-	setupAPIRoutes(r)
+	api.SetupAPIRoutes(r)
 
 	// NoRoute will handle any unmatched routes
 	r.NoRoute(func(c *gin.Context) {
