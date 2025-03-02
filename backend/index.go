@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
     "app/db"
     "app/routes"
 	"github.com/gin-gonic/gin"
@@ -23,10 +22,7 @@ func main() {
 	})
 
 	// Set up port based on environment
-	port := ":80"
-	if os.Getenv("GO_ENV") == "development" {
-		port = ":8080"
-	}
+	port := ":8080"
 
 	fmt.Println("Server starting on" + port)
 

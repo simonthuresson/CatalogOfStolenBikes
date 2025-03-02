@@ -1,0 +1,24 @@
+services:
+  backend:
+    container_name: backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+    tty: true
+  postgres:
+    image: postgres:17
+    container_name: my_postgres
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
