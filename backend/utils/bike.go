@@ -78,67 +78,74 @@ func GetAllBikes(c *gin.Context) {
 }
 
 func CreateBike(c *gin.Context) {
-	type ReportStolenBikeRequest struct {
-		Description string `json:"description" binding:"required"`
-		CitizenID   uint   `json:"citizen_id" binding:"required"`
-	}
+    // Get the citizen from the context that was set in AuthMiddleware
+    citizenValue, exists := c.Get("citizen")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{
+            "error": "Authentication required",
+        })
+        return
+    }
+    
+    citizen, ok := citizenValue.(db.Citizen)
+    if !ok {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Invalid citizen data",
+        })
+        return
+    }
 
-	var req ReportStolenBikeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
+    type ReportStolenBikeRequest struct {
+        Description string `json:"description" binding:"required"`
+    }
 
-	// Verify citizen exists
-	var citizen db.Citizen
-	if result := db.DB.First(&citizen, req.CitizenID); result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Citizen not found",
-		})
-		return
-	}
+    var req ReportStolenBikeRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
 
-	// Initialize new bike with nil Police fields
-	newBike := db.Bike{
-		Description: req.Description,
-		CitizenID:   req.CitizenID,
-		Citizen:     citizen,
-		Found:       false,
-		PoliceID:    nil,
-		Police:      nil,
-	}
+    // Initialize new bike with nil Police fields
+    newBike := db.Bike{
+        Description: req.Description,
+        CitizenID:   citizen.ID,  // Use the ID from the authenticated user
+        Citizen:     citizen,
+        Found:       false,
+        PoliceID:    nil,
+        Police:      nil,
+    }
 
-	// Try to find an available police officer
-	var police db.Police
-	result := db.DB.Where("id NOT IN (SELECT police_id FROM bikes WHERE police_id IS NOT NULL)").First(&police)
+    // Try to find an available police officer
+    var police db.Police
+    result := db.DB.Where("id NOT IN (SELECT police_id FROM bikes WHERE police_id IS NOT NULL)").First(&police)
 
-	// If a police officer is found, assign them to the bike
-	if result.Error == nil {
-		newBike.PoliceID = &police.ID
-		newBike.Police = &police
-	}
+    // If a police officer is found, assign them to the bike
+    if result.Error == nil {
+        newBike.PoliceID = &police.ID
+        newBike.Police = &police
+    }
 
-	// Create the bike
-	if result := db.DB.Create(&newBike); result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to report stolen bike",
-		})
-		return
-	}
+    // Create the bike
+    if result := db.DB.Create(&newBike); result.Error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to report stolen bike",
+        })
+        return
+    }
 
-	// Prepare response message
-	responseMsg := "Stolen bike reported"
-	if newBike.PoliceID != nil {
-		responseMsg += " and assigned to police"
-	} else {
-		responseMsg += " but no available police to assign"
-	}
+    // Prepare response message
+    responseMsg := "Stolen bike reported"
+    if newBike.PoliceID != nil {
+        responseMsg += " and assigned to police"
+    } else {
+        responseMsg += " but no available police to assign"
+    }
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":               responseMsg,
-		"bike_id":               newBike.ID,
-		"assigned_to_police_id": newBike.PoliceID,
-	})
+    c.JSON(http.StatusCreated, gin.H{
+        "message":               responseMsg,
+        "bike_id":               newBike.ID,
+        "assigned_to_police_id": newBike.PoliceID,
+    })
 }

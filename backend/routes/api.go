@@ -26,7 +26,7 @@ func SetupAPIRoutes(r *gin.Engine) {
 	bike.Use((utils.AuthMiddleware()))
 	{
 		bike.GET("/", utils.GetAllBikes)
-		bike.POST("/", utils.CreateBike)
+		bike.GET("/create", utils.CreateBike)
 		bike.GET("/found/:id", utils.FoundBike)
 	}
 	login := r.Group("/login")
