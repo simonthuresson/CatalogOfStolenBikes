@@ -38,10 +38,19 @@ This starts the server and database. The endpoints are accesible from localhost:
 ## Endpoints
 
 ### Police
+**Middleware**: Requires police authentication, except create police for simplification (POST)
 Base URL: `/api/police`
 
 - **GET /** - Retrieve all police records
 - **POST /** - Create a new police record
+Accepts JSON payload:
+  ```json
+  {
+    "email": "user@example.com",
+    "name": "policeName",
+    "password": "password123"
+  }
+  ```
 - **PATCH /:id** - Update a police record by ID
 - **DELETE /:id** - Delete a police record by ID
 
@@ -50,20 +59,36 @@ Base URL: `/api/citizen`
 
 - **GET /** - Retrieve all citizen records
 - **POST /** - Create a new citizen record
+ Accepts JSON payload:
+  ```json
+  {
+    "email": "user@example.com",
+    "name": "citizenName",
+    "password": "password123"
+  }
 
 ### Bike
 Base URL: `/api/bike`
 
-**Middleware**: Requires authentication (`utils.AuthMiddleware()`)
+**Middleware**: Requires citizen authentication 
 
 - **GET /** - Retrieve all bikes
 - **POST /** - Report a stolen bike
+ Accepts JSON payload:
+  ```json
+  {
+    "email": "user@example.com",
+    "name": "policeName",
+    "password": "password123"
+  }
+  ```
 - **GET /found/:id** - Mark a bike as found by ID and unassign the police officer
 
 ### Login
 Base URL: `/login`
 
 - **POST /citizen** - Authenticate a citizen and return a session/token
+- **POST /police** - Authenticate a police and return a session/token
 
 ## Authentication
 
@@ -71,15 +96,13 @@ Base URL: `/login`
 
 - Checks for a valid `jwt_token` cookie
 - Parses and validates the token
-- Retrieves the associated citizen from the database
-- Attaches the citizen object to the request context
 
 ### JWT Generation (`generateJWT`)
 
 - Generates a JWT token valid for 24 hours
-- Contains `email` and `user_id` claims
+- Contains `email`, `user_id` and `user_type` claims
 
-### Citizen Login (`LoginCitizen`)
+### Respective Login 
 
 - Accepts JSON payload:
   ```json
@@ -88,59 +111,8 @@ Base URL: `/login`
     "password": "password123"
   }
   ```
-- Validates credentials and finds the citizen
 - Verifies password
 - Generates a JWT token on successful login
 
-## Bike Management
-
-### Report Stolen Bike (`CreateBike`)
-
-- Accepts JSON payload:
-  ```json
-  {
-    "description": "Black mountain bike",
-    "citizen_id": 1
-  }
-  ```
-- Verifies that the citizen exists
-- Attempts to assign an available police officer to the stolen bike
-- Creates a new bike record in the database
-- Responds with:
-  ```json
-  {
-    "message": "Stolen bike reported and assigned to police",
-    "bike_id": 10,
-    "assigned_to_police_id": 3
-  }
-  ```
-
-### Retrieve All Bikes (`GetAllBikes`)
-
-- Returns a list of all bikes, including associated citizens and police officers:
-  ```json
-  {
-    "bikes": [
-      {
-        "id": 1,
-        "description": "Red road bike",
-        "found": false,
-        "citizen": { "id": 1, "name": "John Doe" },
-        "police": { "id": 2, "name": "Officer Jane" }
-      }
-    ]
-  }
-  ```
-
-### Mark Bike as Found (`FoundBike`)
-
-- Marks a bike as found and unassigns the police officer
-- Attempts to reassign the freed-up police officer to another unassigned stolen bike
-- Responds with:
-  ```json
-  {
-    "message": "Bike marked as found and police officer unassigned"
-  }
-  ```
 
 
