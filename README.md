@@ -24,4 +24,4 @@ or
 ```bash
 docker compose up -d --build
 ```
-this starts the server and database which is accesible from localhost:8080
+This starts the server and database. The endpoints are accesible from localhost:8080
