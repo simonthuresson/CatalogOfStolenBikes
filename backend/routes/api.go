@@ -8,7 +8,6 @@ import (
 
 
 func SetupAPIRoutes(r *gin.Engine) {
-	// Create an api group/router
 	api := r.Group("/api")
 	{
 		police := api.Group("/police")

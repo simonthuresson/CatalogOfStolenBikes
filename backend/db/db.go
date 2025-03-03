@@ -10,7 +10,6 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Models
 type Police struct {
 	gorm.Model
 	Email        string `gorm:"uniqueIndex"`
@@ -24,7 +23,7 @@ type Citizen struct {
 	Email       string `gorm:"uniqueIndex"`
 	Password    string `gorm:"not null" json:"-"`
 	Name        string
-	StolenBikes []Bike `gorm:"foreignKey:CitizenID"` // One-to-many relationship
+	StolenBikes []Bike `gorm:"foreignKey:CitizenID"` 
 }
 
 type Bike struct {
@@ -33,7 +32,7 @@ type Bike struct {
 	PoliceID    *uint `gorm:"unique"`
 	Police      *Police
 	CitizenID   uint    `gorm:"not null"`
-	Citizen     Citizen // Add omitempty
+	Citizen     Citizen 
 	Found       bool
 }
 

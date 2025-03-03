@@ -67,7 +67,6 @@ func FoundBike(c *gin.Context) {
 func GetAllBikes(c *gin.Context) {
 	var bikes []db.Bike
 
-	// Preload relationships
 	db.DB.Preload("Citizen").
 		Preload("Police").
 		Find(&bikes)
@@ -78,7 +77,6 @@ func GetAllBikes(c *gin.Context) {
 }
 
 func CreateBike(c *gin.Context) {
-    // Get the citizen from the context that was set in AuthMiddleware
     citizenValue, exists := c.Get("citizen")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{
@@ -107,10 +105,9 @@ func CreateBike(c *gin.Context) {
         return
     }
 
-    // Initialize new bike with nil Police fields
     newBike := db.Bike{
         Description: req.Description,
-        CitizenID:   citizen.ID,  // Use the ID from the authenticated user
+        CitizenID:   citizen.ID, 
         Citizen:     citizen,
         Found:       false,
         PoliceID:    nil,

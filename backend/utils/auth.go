@@ -88,12 +88,10 @@ func createAuthMiddleware(userType string) gin.HandlerFunc {
 	}
 }
 
-// AuthMiddlewareCitizen returns middleware for citizen authentication
 func AuthMiddlewareCitizen() gin.HandlerFunc {
 	return createAuthMiddleware("citizen")
 }
 
-// AuthMiddlewarePolice returns middleware for police authentication
 func AuthMiddlewarePolice() gin.HandlerFunc {
 	return createAuthMiddleware("police")
 }
@@ -120,7 +118,6 @@ func generateJWT(user JWTUser, userType string) (string, error) {
 	return tokenString, nil
 }
 
-// Generic login function to handle both police and citizen logins
 func handleLogin(c *gin.Context, userType string) {
 	type LoginRequest struct {
 		Email    string `json:"email" binding:"required,email"`
@@ -171,7 +168,6 @@ func handleLogin(c *gin.Context, userType string) {
 		return
 	}
 
-	// Generate JWT
 	token, err := generateJWT(user, userType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})

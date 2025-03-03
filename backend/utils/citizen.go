@@ -27,14 +27,12 @@ func CreateCitizen(c *gin.Context) {
 		fmt.Println("failed to hash password: %w", err)
 	}
 
-	// Create citizen record
 	newCitizen := db.Citizen{
 		Email:    req.Email,
 		Password: string(hashedPassword),
 		Name:     req.Name,
 	}
 
-	// Save to database
 	if result := db.DB.Create(&newCitizen); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create citizen",

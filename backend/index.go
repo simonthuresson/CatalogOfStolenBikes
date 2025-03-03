@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
     "app/db"
     "app/routes"
 	"github.com/gin-gonic/gin"
@@ -14,14 +13,6 @@ func main() {
 
 	api.SetupAPIRoutes(r)
 
-	// NoRoute will handle any unmatched routes
-	r.NoRoute(func(c *gin.Context) {
-		// Try to serve static file
-		fileServer := http.FileServer(http.Dir("./public"))
-		fileServer.ServeHTTP(c.Writer, c.Request)
-	})
-
-	// Set up port based on environment
 	port := ":8080"
 
 	fmt.Println("Server starting on" + port)

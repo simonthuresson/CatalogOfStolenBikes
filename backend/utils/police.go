@@ -8,7 +8,6 @@ import (
 	"app/db"
 )
 
-// Handler functions
 func GetAllPolice(c *gin.Context) {
 	var polices []db.Police
 	db.DB.Preload("AssignedBike").Find(&polices)
@@ -20,13 +19,11 @@ func GetAllPolice(c *gin.Context) {
 func UpdatePolice(c *gin.Context) {
 	id := c.Param("id")
 
-	// Define request structure
 	type UpdateRequest struct {
 		Name     string `json:"name" binding:"required"`
 		Password string `json:"password" binding:"required,min=6"`
 	}
 
-	// Parse request
 	var req UpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -35,7 +32,6 @@ func UpdatePolice(c *gin.Context) {
 		return
 	}
 
-	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -44,7 +40,6 @@ func UpdatePolice(c *gin.Context) {
 		return
 	}
 
-	// Find the police officer
 	var police db.Police
 	if result := db.DB.First(&police, id); result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -53,7 +48,6 @@ func UpdatePolice(c *gin.Context) {
 		return
 	}
 
-	// Update the record
 	result := db.DB.Model(&police).Updates(db.Police{
 		Name:     req.Name,
 		Password: string(hashedPassword),
@@ -94,14 +88,12 @@ func CreatePolice(c *gin.Context) {
 		fmt.Println("failed to hash password: %w", err)
 	}
 
-	// Create police record
 	newPolice := db.Police{
 		Email:    req.Email,
 		Password: string(hashedPassword),
 		Name:     req.Name,
 	}
 
-	// Save to database
 	if result := db.DB.Create(&newPolice); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create police",
