@@ -31,7 +31,6 @@ func SetupAPIRoutes(r *gin.Engine) {
 	}
 	login := r.Group("/login")
 	{
-		login.POST("police")
 		login.POST("citizen", utils.LoginCitizen)
 	}
 }
