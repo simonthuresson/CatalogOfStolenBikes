@@ -87,24 +87,18 @@ Base URL: `/login`
 
 - **POST /citizen** - Authenticate a citizen and return a session/token
 - **POST /police** - Authenticate a police and return a session/token
-
-## Authentication
-
-### Middleware: `AuthMiddleware`
-- Checks for a valid `jwt_token` cookie
-- Parses and validates the token
-
-### JWT Generation (`generateJWT`)
-- Generates a JWT token valid for 24 hours
-- Contains `email`, `user_id` and `user_type` claims
-
-### Login Endpoints
-- Accept JSON payload:
+- Both accepts JSON:
   ```json
   {
     "email": "user@example.com",
     "password": "password123"
   }
   ```
-- Verify password
-- Generate a JWT token on successful login
+
+## Authentication
+
+ - Uses JWT cookies
+ - One type of cookie for police authentication and one for citizen
+ - Valid for 24 h
+ - Http-only cookie
+
