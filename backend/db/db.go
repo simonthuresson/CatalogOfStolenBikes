@@ -86,3 +86,20 @@ func Database() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 }
+
+func (c Citizen) GetEmail() string {
+    return c.Email
+}
+
+func (c Citizen) GetID() uint {
+    return c.ID
+}
+
+// For Police
+func (p Police) GetEmail() string {
+    return p.Email
+}
+
+func (p Police) GetID() uint {
+    return p.ID
+}

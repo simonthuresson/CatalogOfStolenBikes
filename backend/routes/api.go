@@ -12,8 +12,9 @@ func SetupAPIRoutes(r *gin.Engine) {
 	api := r.Group("/api")
 	{
 		police := api.Group("/police")
-		police.GET("/", utils.GetAllPolice)
 		police.POST("/", utils.CreatePolice)
+		police.Use(utils.AuthMiddlewarePolice())
+		police.GET("/", utils.GetAllPolice)
 		police.PATCH("/:id", utils.UpdatePolice)
 		police.DELETE("/:id", utils.DeletePolice)
 	}
@@ -23,7 +24,7 @@ func SetupAPIRoutes(r *gin.Engine) {
 		citizen.POST("/", utils.CreateCitizen)
 	}
 	bike := api.Group("/bike")
-	bike.Use((utils.AuthMiddleware()))
+	bike.Use((utils.AuthMiddlewareCitizen()))
 	{
 		bike.GET("/", utils.GetAllBikes)
 		bike.GET("/create", utils.CreateBike)
@@ -31,7 +32,8 @@ func SetupAPIRoutes(r *gin.Engine) {
 	}
 	login := r.Group("/login")
 	{
-		login.POST("citizen", utils.LoginCitizen)
+		login.POST("/citizen", utils.LoginCitizen)
+		login.POST("/police", utils.LoginPolice)
 	}
 }
 
