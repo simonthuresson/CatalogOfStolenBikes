@@ -1,32 +1,28 @@
-# Catalog of stolen bikes
+# Catalog of Stolen Bikes
 
 ## Overview
-
-A simple Go server to use for cataloging stolen bikes. This application is deployed with Docker. 
+A simple Go server for cataloging stolen bikes. This application is deployed with Docker.
 
 ## Requirements
-
- - Docker compose 
+- Docker Compose
 
 ## Architectural Overview
-![Image description](Overview.png)
+![Architecture diagram](Overview.png)
 
-### Description of architecture
+### Description of Architecture
 The entry point (main) begins by initializing the database. Once initialization is complete, the server's endpoints are registered. The functions associated with each endpoint are fetched from the utils directory, which contains several utility files organized by specific domains. Each utility file uses the initialized database to perform queries. After this setup process is complete, the main file starts the server.
 
 ## Quick Start
-From root directory
+From root directory:
 
 ```bash
 ./start-server.sh
 ```
-or 
+or
 ```bash
 docker compose up -d --build
 ```
-This starts the server and database. The endpoints are accesible from localhost:8080
-
-## API Documentation
+This starts the server and database. The endpoints are accessible from localhost:8080
 
 ## API Documentation
 
@@ -38,12 +34,11 @@ This starts the server and database. The endpoints are accesible from localhost:
 ## Endpoints
 
 ### Police
-**Middleware**: Requires police authentication, except create police for simplification (POST)
+**Middleware**: Requires police authentication, except for police creation (POST) for simplification
 Base URL: `/api/police`
 
 - **GET /** - Retrieve all police records
 - **POST /** - Create a new police record
-Accepts JSON payload:
   ```json
   {
     "email": "user@example.com",
@@ -52,6 +47,12 @@ Accepts JSON payload:
   }
   ```
 - **PATCH /:id** - Update a police record by ID
+  ```json
+  {
+    "name": "policeName",
+    "password": "password123"
+  }
+  ```
 - **DELETE /:id** - Delete a police record by ID
 
 ### Citizen
@@ -59,27 +60,24 @@ Base URL: `/api/citizen`
 
 - **GET /** - Retrieve all citizen records
 - **POST /** - Create a new citizen record
- Accepts JSON payload:
   ```json
   {
     "email": "user@example.com",
     "name": "citizenName",
     "password": "password123"
   }
+  ```
 
 ### Bike
 Base URL: `/api/bike`
 
-**Middleware**: Requires citizen authentication 
+**Middleware**: Requires citizen authentication
 
 - **GET /** - Retrieve all bikes
 - **POST /** - Report a stolen bike
- Accepts JSON payload:
   ```json
   {
-    "email": "user@example.com",
-    "name": "policeName",
-    "password": "password123"
+    "description": "21-speed mountain bike with front suspension"
   }
   ```
 - **GET /found/:id** - Mark a bike as found by ID and unassign the police officer
@@ -93,26 +91,20 @@ Base URL: `/login`
 ## Authentication
 
 ### Middleware: `AuthMiddleware`
-
 - Checks for a valid `jwt_token` cookie
 - Parses and validates the token
 
 ### JWT Generation (`generateJWT`)
-
 - Generates a JWT token valid for 24 hours
 - Contains `email`, `user_id` and `user_type` claims
 
-### Respective Login 
-
-- Accepts JSON payload:
+### Login Endpoints
+- Accept JSON payload:
   ```json
   {
     "email": "user@example.com",
     "password": "password123"
   }
   ```
-- Verifies password
-- Generates a JWT token on successful login
-
-
-
+- Verify password
+- Generate a JWT token on successful login
