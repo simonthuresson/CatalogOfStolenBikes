@@ -20,7 +20,7 @@ From root directory:
 ```
 or
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 This starts the server and database. The endpoints are accessible from localhost:8080
 
