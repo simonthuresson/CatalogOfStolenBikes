@@ -108,8 +108,29 @@ func CreatePolice(c *gin.Context) {
 		})
 		return
 	}
+	
+	// Check if there's an unassigned stolen bike to assign to this police officer
+	var unassignedBike db.Bike
+	if result := db.DB.Where("police_id IS NULL AND found = ?", false).First(&unassignedBike); result.Error == nil {
+		// Found an unassigned bike, assign it to the police officer
+		unassignedBike.PoliceID = &newPolice.ID
+		if updateResult := db.DB.Save(&unassignedBike); updateResult.Error != nil {
+			// Log the error but don't fail the police creation
+			fmt.Printf("Failed to assign bike to police: %v\n", updateResult.Error)
+		}
+		
+		c.JSON(http.StatusCreated, gin.H{
+			"message": "Police created and assigned to a stolen bike",
+			"police_id": newPolice.ID,
+			"assigned_bike_id": unassignedBike.ID,
+		})
+		return
+	}
+	
+	// No bike to assign
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "User created",
+		"message": "Police created successfully. No bikes available for assignment.",
+		"police_id": newPolice.ID,
 	})
 }
 
